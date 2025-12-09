@@ -1,0 +1,45 @@
+services:
+  # Service Web (Backend API)
+  - type: web
+    name: medical-records-api
+    env: node
+    region: frankfurt  # ou virginia, singapore, etc.
+    plan: free  # ou starter, professional
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DB_HOST
+        fromDatabase:
+          name: medical-records-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: medical-records-db
+          property: port
+      - key: DB_USER
+        fromDatabase:
+          name: medical-records-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: medical-records-db
+          property: password
+      - key: DB_NAME
+        fromDatabase:
+          name: medical-records-db
+          property: database
+
+databases:
+  # Base de données MySQL
+  - name: medical-records-db
+    databaseName: medical_system
+    plan: free  # ou starter, professional
+    region: frankfurt
