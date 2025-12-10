@@ -32,6 +32,10 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: 'Something went wrong!' });
 });
 
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
+
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
