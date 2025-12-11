@@ -11,61 +11,61 @@ class MedicalRecord {
         
         const { blood_type, height, weight, allergies, chronic_diseases, current_medications } = recordData;
         
-        const [result] = await pool.execute(
+        const result = await pool.query(
             `INSERT INTO medical_records 
             (patient_id, doctor_id, record_code, blood_type, height, weight, allergies, chronic_diseases, current_medications) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
             [patientId, doctorId, recordCode, blood_type, height, weight, allergies, chronic_diseases, current_medications]
         );
-        return { id: result.insertId, recordCode };
+        return { id: result.rows[0].id, recordCode };
     }
 
     static async findByRecordCode(recordCode) {
-        const [rows] = await pool.execute(
+        const result = await pool.query(
             `SELECT mr.*, p.full_name as patient_name, p.date_of_birth, p.gender,
             d.full_name as doctor_name
             FROM medical_records mr
             JOIN patients p ON mr.patient_id = p.id
             JOIN doctors d ON mr.doctor_id = d.id
-            WHERE mr.record_code = ?`,
+            WHERE mr.record_code = $1`,
             [recordCode]
         );
-        return rows[0];
+        return result.rows[0];
     }
 
     static async findByPatientId(patientId) {
-        const [rows] = await pool.execute(
+        const result = await pool.query(
             `SELECT mr.*, d.full_name as doctor_name 
             FROM medical_records mr
             JOIN doctors d ON mr.doctor_id = d.id
-            WHERE mr.patient_id = ?`,
+            WHERE mr.patient_id = $1`,
             [patientId]
         );
-        return rows[0];
+        return result.rows[0];
     }
 
     static async addConsultation(medicalRecordId, doctorId, consultationData) {
         const { consultation_date, symptoms, diagnosis, prescription, notes } = consultationData;
         
-        const [result] = await pool.execute(
+        const result = await pool.query(
             `INSERT INTO consultations 
             (medical_record_id, doctor_id, consultation_date, symptoms, diagnosis, prescription, notes) 
-            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
             [medicalRecordId, doctorId, consultation_date, symptoms, diagnosis, prescription, notes]
         );
-        return result.insertId;
+        return result.rows[0].id;
     }
 
     static async getConsultations(medicalRecordId) {
-        const [rows] = await pool.execute(
+        const result = await pool.query(
             `SELECT c.*, d.full_name as doctor_name 
             FROM consultations c
             JOIN doctors d ON c.doctor_id = d.id
-            WHERE c.medical_record_id = ?
+            WHERE c.medical_record_id = $1
             ORDER BY c.consultation_date DESC`,
             [medicalRecordId]
         );
-        return rows;
+        return result.rows;
     }
 }
 

@@ -1,7 +1,6 @@
 import jwt from 'jsonwebtoken';
 import Doctor from '../models/doctor.js';
 
-
 class AuthController {
     static async registerDoctor(req, res) {
         try {

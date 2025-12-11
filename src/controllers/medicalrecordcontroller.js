@@ -101,10 +101,12 @@ class MedicalRecordController {
             // Construire la requête dynamiquement
             const fields = [];
             const values = [];
+            let paramCount = 1;
             
             Object.keys(updateData).forEach(key => {
-                fields.push(`${key} = ?`);
+                fields.push(`${key} = $${paramCount}`);
                 values.push(updateData[key]);
+                paramCount++;
             });
             
             if (fields.length === 0) {
@@ -113,8 +115,8 @@ class MedicalRecordController {
             
             values.push(medical_record_id);
             
-            await pool.execute(
-                `UPDATE medical_records SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+            await pool.query(
+                `UPDATE medical_records SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${paramCount}`,
                 values
             );
             

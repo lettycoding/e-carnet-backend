@@ -1,7 +1,6 @@
 import pool from '../config/database.js';
 import Doctor from '../models/doctor.js';
-import Patient from '../models/patient.js';
-import MedicalRecord from '../models/medicalrecord.js';
+import bcrypt from 'bcryptjs';
 
 class DoctorController {
     // Obtenir le profil du docteur
@@ -35,20 +34,24 @@ class DoctorController {
             // Construire la requête dynamiquement
             const fields = [];
             const values = [];
+            let paramCount = 1;
             
             if (full_name) {
-                fields.push('full_name = ?');
+                fields.push(`full_name = $${paramCount}`);
                 values.push(full_name);
+                paramCount++;
             }
             
             if (specialization) {
-                fields.push('specialization = ?');
+                fields.push(`specialization = $${paramCount}`);
                 values.push(specialization);
+                paramCount++;
             }
             
             if (phone_number) {
-                fields.push('phone_number = ?');
+                fields.push(`phone_number = $${paramCount}`);
                 values.push(phone_number);
+                paramCount++;
             }
             
             if (fields.length === 0) {
@@ -57,8 +60,8 @@ class DoctorController {
             
             values.push(doctorId);
             
-            await pool.execute(
-                `UPDATE doctors SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+            await pool.query(
+                `UPDATE doctors SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${paramCount}`,
                 values
             );
             
@@ -82,37 +85,37 @@ class DoctorController {
             const doctorId = req.user.id;
             
             // Compter les patients créés
-            const [patientCount] = await pool.execute(
-                'SELECT COUNT(*) as count FROM patients WHERE created_by = ?',
+            const patientCountResult = await pool.query(
+                'SELECT COUNT(*) as count FROM patients WHERE created_by = $1',
                 [doctorId]
             );
             
             // Compter les consultations du mois
-            const [consultationCount] = await pool.execute(
+            const consultationCountResult = await pool.query(
                 `SELECT COUNT(*) as count FROM consultations c
                  JOIN medical_records mr ON c.medical_record_id = mr.id
-                 WHERE mr.doctor_id = ? AND MONTH(c.consultation_date) = MONTH(CURRENT_DATE())`,
+                 WHERE mr.doctor_id = $1 AND EXTRACT(MONTH FROM c.consultation_date) = EXTRACT(MONTH FROM CURRENT_DATE)`,
                 [doctorId]
             );
             
             // Derniers patients ajoutés
-            const [recentPatients] = await pool.execute(
+            const recentPatientsResult = await pool.query(
                 `SELECT p.id, p.full_name, p.unique_code, p.created_at, mr.record_code
                  FROM patients p
                  LEFT JOIN medical_records mr ON p.id = mr.patient_id
-                 WHERE p.created_by = ?
+                 WHERE p.created_by = $1
                  ORDER BY p.created_at DESC
                  LIMIT 5`,
                 [doctorId]
             );
             
             // Dernières consultations
-            const [recentConsultations] = await pool.execute(
+            const recentConsultationsResult = await pool.query(
                 `SELECT c.id, p.full_name as patient_name, c.consultation_date, c.diagnosis
                  FROM consultations c
                  JOIN medical_records mr ON c.medical_record_id = mr.id
                  JOIN patients p ON mr.patient_id = p.id
-                 WHERE c.doctor_id = ?
+                 WHERE c.doctor_id = $1
                  ORDER BY c.consultation_date DESC
                  LIMIT 5`,
                 [doctorId]
@@ -120,10 +123,10 @@ class DoctorController {
             
             res.json({
                 statistics: {
-                    total_patients: patientCount[0].count,
-                    monthly_consultations: consultationCount[0].count,
-                    recent_patients: recentPatients,
-                    recent_consultations: recentConsultations
+                    total_patients: parseInt(patientCountResult.rows[0].count),
+                    monthly_consultations: parseInt(consultationCountResult.rows[0].count),
+                    recent_patients: recentPatientsResult.rows,
+                    recent_consultations: recentConsultationsResult.rows
                 }
             });
         } catch (error) {
@@ -146,34 +149,34 @@ class DoctorController {
             
             if (search_type === 'patient_name') {
                 // Recherche par nom de patient
-                const [rows] = await pool.execute(
+                const result = await pool.query(
                     `SELECT p.*, mr.record_code 
                      FROM patients p
                      LEFT JOIN medical_records mr ON p.id = mr.patient_id
-                     WHERE p.full_name LIKE ? AND p.created_by = ?`,
+                     WHERE p.full_name ILIKE $1 AND p.created_by = $2`,
                     [`%${search_term}%`, doctorId]
                 );
-                results = rows;
+                results = result.rows;
             } else if (search_type === 'record_code') {
                 // Recherche par code de dossier
-                const [rows] = await pool.execute(
+                const result = await pool.query(
                     `SELECT p.*, mr.record_code 
                      FROM patients p
                      JOIN medical_records mr ON p.id = mr.patient_id
-                     WHERE mr.record_code = ? AND mr.doctor_id = ?`,
+                     WHERE mr.record_code = $1 AND mr.doctor_id = $2`,
                     [search_term, doctorId]
                 );
-                results = rows;
+                results = result.rows;
             } else if (search_type === 'patient_code') {
                 // Recherche par code patient
-                const [rows] = await pool.execute(
+                const result = await pool.query(
                     `SELECT p.*, mr.record_code 
                      FROM patients p
                      LEFT JOIN medical_records mr ON p.id = mr.patient_id
-                     WHERE p.unique_code = ? AND p.created_by = ?`,
+                     WHERE p.unique_code = $1 AND p.created_by = $2`,
                     [search_term, doctorId]
                 );
-                results = rows;
+                results = result.rows;
             }
             
             res.json({
@@ -190,20 +193,20 @@ class DoctorController {
         try {
             const doctorId = req.user.id;
             
-            const [rows] = await pool.execute(
+            const result = await pool.query(
                 `SELECT mr.*, p.full_name as patient_name, p.date_of_birth, p.gender,
                  COUNT(c.id) as consultation_count
                  FROM medical_records mr
                  JOIN patients p ON mr.patient_id = p.id
                  LEFT JOIN consultations c ON mr.id = c.medical_record_id
-                 WHERE mr.doctor_id = ?
-                 GROUP BY mr.id
+                 WHERE mr.doctor_id = $1
+                 GROUP BY mr.id, p.id, p.full_name, p.date_of_birth, p.gender
                  ORDER BY p.full_name`,
                 [doctorId]
             );
             
             res.json({
-                medical_records: rows
+                medical_records: result.rows
             });
         } catch (error) {
             console.error(error);
@@ -235,8 +238,8 @@ class DoctorController {
             
             // Mettre à jour avec le nouveau mot de passe
             const hashedPassword = await bcrypt.hash(new_password, 10);
-            await pool.execute(
-                'UPDATE doctors SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+            await pool.query(
+                'UPDATE doctors SET password = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
                 [hashedPassword, doctorId]
             );
             

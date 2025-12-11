@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
+import initializeDatabase from './script/init_database.js';
 dotenv.config();
 
 import authRoutes from './routes/authroutes.js';
@@ -19,6 +20,8 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+// In app.js, update CORS config
+
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -38,8 +41,10 @@ app.get('/health', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+initializeDatabase().then(() => {
+    app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+    });
 });
 
 export default app;
