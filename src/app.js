@@ -8,6 +8,7 @@ dotenv.config();
 import authRoutes from './routes/authroutes.js';
 import doctorRoutes from './routes/doctorroutes.js';
 import patientRoutes from './routes/patientroutes.js';
+import pool from './config/database.js';
 
 
 import consultationRoutes from './routes/consultationroutes.js';
@@ -32,6 +33,69 @@ app.use('/api/doctors', doctorRoutes);
 app.use('/api/patients', patientRoutes);
 app.use('/api/consultations', consultationRoutes);
 app.use('/api/medical-records',consultationRoutes); // ← Ajout des routes de consultation
+app.post('/api/medical-records/access', async (req, res) => {
+  try {
+    const { record_code } = req.body;
+    
+    if (!record_code) {
+      return res.status(400).json({ error: 'Record code is required' });
+    }
+    
+    // Chercher le carnet médical
+    const medicalRecordResult = await pool.query(
+      `SELECT 
+          mr.*,
+          p.full_name as patient_name,
+          p.date_of_birth,
+          p.gender,
+          p.phone_number,
+          p.email,
+          p.address,
+          p.emergency_contact
+       FROM medical_records mr
+       JOIN patients p ON mr.patient_id = p.id
+       WHERE mr.record_code = $1`,
+      [record_code]
+    );
+    
+    if (medicalRecordResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Medical record not found' });
+    }
+    
+    const medicalRecord = medicalRecordResult.rows[0];
+    
+    // Récupérer les consultations
+    const consultationsResult = await pool.query(
+      `SELECT 
+          c.id,
+          c.consultation_date,
+          c.symptoms,
+          c.diagnosis,
+          c.prescription,
+          c.notes,
+          c.created_at,
+          d.full_name as doctor_name
+       FROM consultations c
+       LEFT JOIN doctors d ON c.doctor_id = d.id
+       WHERE c.medical_record_id = $1
+       ORDER BY c.consultation_date DESC`,
+      [medicalRecord.id]
+    );
+    
+    res.json({
+      success: true,
+      medical_record: medicalRecord,
+      consultations: consultationsResult.rows
+    });
+    
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to access medical record' 
+    });
+  }
+});
 
 // Route de santé
 app.get('/health', (req, res) => {
