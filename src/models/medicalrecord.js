@@ -11,7 +11,6 @@ class MedicalRecord {
         
         const { blood_type, height, weight, allergies, chronic_diseases, current_medications } = recordData;
          
-        
         const result = await pool.query(
             `INSERT INTO medical_records 
             (patient_id, doctor_id, record_code, blood_type, height, weight, allergies, chronic_diseases, current_medications) 
@@ -45,48 +44,77 @@ class MedicalRecord {
         return result.rows[0];
     }
 
-   static async addConsultation(medicalRecordId, doctorId, consultationData) {
-    const { 
-        plaintes,          // Renommer en symptoms dans la base
-        examen,            // Renommer en diagnosis dans la base
-        prescription, 
-        prochain_rdv,      // Garder pour la colonne prochain_rdv
-        notes,
-        consultation_date  // Peut être undefined
-    } = consultationData;
+    static async addConsultation(medicalRecordId, doctorId, consultationData) {
+    console.log('=== Données reçues addConsultation ===');
+    console.log('consultationData:', consultationData);
     
-    // Utiliser la date envoyée ou la date actuelle
-    const consultationDate = consultation_date || new Date();
+    // MAPPING: plaintes (API) → symptoms (BD), examen (API) → diagnosis (BD)
+    const symptoms = consultationData.plaintes || consultationData.symptoms || consultationData.symtoms;
+    const diagnosis = consultationData.examen || consultationData.diagnosis;
+    const prescription = consultationData.prescription;
+    const notes = consultationData.notes;
+    
+    // Date obligatoire
+    const consultationDate = consultationData.consultation_date || new Date();
+    
+    console.log('=== Mapping des données ===');
+    console.log('symptoms (plaintes):', symptoms);
+    console.log('diagnosis (examen):', diagnosis);
+    console.log('prescription:', prescription);
+    console.log('notes:', notes);
+    console.log('consultationDate:', consultationDate);
     
     const result = await pool.query(
         `INSERT INTO consultations 
         (medical_record_id, doctor_id, consultation_date, symptoms, diagnosis, prescription, notes) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
         [
-
-            medicalRecordId, 
-            doctorId, 
-            consultationDate,          // $3: consultation_date
-            plaintes || null,          // $4: symptoms (plaintes)
-            examen || null,            // $5: diagnosis (examen)
-            prescription || null,      // $6: prescription     
-            notes || null              // $8: notes
+            medicalRecordId,          // $1: medical_record_id
+            doctorId,                 // $2: doctor_id
+            consultationDate,         // $3: consultation_date
+            symptoms || null,         // $4: symptoms (vient de plaintes)
+            diagnosis || null,        // $5: diagnosis (vient de examen)
+            prescription || null,     // $6: prescription     
+            notes || null             // $7: notes
         ]
     );
+    
+    console.log('=== Consultation créée avec ID ===');
+    console.log('ID:', result.rows[0].id);
+    
     return result.rows[0].id;
 }
 
-    static async getConsultations(medicalRecordId) {
-        const result = await pool.query(
-            `SELECT c.*, d.full_name as doctor_name 
-            FROM consultations c
-            JOIN doctors d ON c.doctor_id = d.id
-            WHERE c.medical_record_id = $1
-            ORDER BY c.consultation_date DESC`,
-            [medicalRecordId]
-        );
-        return result.rows;
-    }
+   static async getConsultations(medicalRecordId) {
+    const result = await pool.query(
+        `SELECT c.*, d.full_name as doctor_name 
+        FROM consultations c
+        JOIN doctors d ON c.doctor_id = d.id
+        WHERE c.medical_record_id = $1
+        ORDER BY c.consultation_date DESC`,
+        [medicalRecordId]
+    );
+    
+    // Mapping inverse pour l'API: symptoms → plaintes, diagnosis → examen
+    const formattedConsultations = result.rows.map(row => ({
+        id: row.id,
+        medical_record_id: row.medical_record_id,
+        doctor_id: row.doctor_id,
+        doctor_name: row.doctor_name,
+        consultation_date: row.consultation_date,
+        plaintes: row.symptoms,      // Mapping symptoms → plaintes pour l'API
+        examen: row.diagnosis,       // Mapping diagnosis → examen pour l'API
+        prescription: row.prescription,
+        notes: row.notes,
+        created_at: row.created_at
+    }));
+    
+    return formattedConsultations;
 }
+
+    
+}
+
+
 
 export default MedicalRecord;
