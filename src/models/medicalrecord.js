@@ -10,13 +10,13 @@ class MedicalRecord {
         const recordCode = await this.generateRecordCode();
         
         const { blood_type, height, weight, allergies, chronic_diseases, current_medications } = recordData;
-         const consultationDate = consultationData.consultation_date || new Date();
+         
         
         const result = await pool.query(
             `INSERT INTO medical_records 
             (patient_id, doctor_id, record_code, blood_type, height, weight, allergies, chronic_diseases, current_medications) 
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-            [patientId, doctorId, recordCode, blood_type, height, weight, allergies, chronic_diseases, current_medications, consultationDate]
+            [patientId, doctorId, recordCode, blood_type, height, weight, allergies, chronic_diseases, current_medications]
         );
         return { id: result.rows[0].id, recordCode };
     }
@@ -45,17 +45,36 @@ class MedicalRecord {
         return result.rows[0];
     }
 
-    static async addConsultation(medicalRecordId, doctorId, consultationData) {
-        const { consultation_date, symptoms, diagnosis, prescription, notes } = consultationData;
-        
-        const result = await pool.query(
-            `INSERT INTO consultations 
-            (medical_record_id, doctor_id, consultation_date, symptoms, diagnosis, prescription, notes) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-            [medicalRecordId, doctorId, consultation_date, symptoms, diagnosis, prescription, notes]
-        );
-        return result.rows[0].id;
-    }
+   static async addConsultation(medicalRecordId, doctorId, consultationData) {
+    const { 
+        plaintes,          // Renommer en symptoms dans la base
+        examen,            // Renommer en diagnosis dans la base
+        prescription, 
+        prochain_rdv,      // Garder pour la colonne prochain_rdv
+        notes,
+        consultation_date  // Peut être undefined
+    } = consultationData;
+    
+    // Utiliser la date envoyée ou la date actuelle
+    const consultationDate = consultation_date || new Date();
+    
+    const result = await pool.query(
+        `INSERT INTO consultations 
+        (medical_record_id, doctor_id, consultation_date, symptoms, diagnosis, prescription, prochain_rdv, notes) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+        [
+            medicalRecordId, 
+            doctorId, 
+            consultationDate,          // $3: consultation_date
+            plaintes || null,          // $4: symptoms (plaintes)
+            examen || null,            // $5: diagnosis (examen)
+            prescription || null,      // $6: prescription
+            prochain_rdv || null,      // $7: prochain_rdv
+            notes || null              // $8: notes
+        ]
+    );
+    return result.rows[0].id;
+}
 
     static async getConsultations(medicalRecordId) {
         const result = await pool.query(
