@@ -60,16 +60,16 @@ class MedicalRecord {
     
     const result = await pool.query(
         `INSERT INTO consultations 
-        (medical_record_id, doctor_id, consultation_date, symptoms, diagnosis, prescription, prochain_rdv, notes) 
+        (medical_record_id, doctor_id, consultation_date, symptoms, diagnosis, prescription, notes) 
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
         [
+
             medicalRecordId, 
             doctorId, 
             consultationDate,          // $3: consultation_date
             plaintes || null,          // $4: symptoms (plaintes)
             examen || null,            // $5: diagnosis (examen)
-            prescription || null,      // $6: prescription
-            prochain_rdv || null,      // $7: prochain_rdv
+            prescription || null,      // $6: prescription     
             notes || null              // $8: notes
         ]
     );
