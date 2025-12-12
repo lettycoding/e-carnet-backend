@@ -6,6 +6,7 @@ class ConsultationController {
             const { medicalRecordId } = req.params;
             const doctorId = req.user.id; // ID du médecin connecté
             const consultationData = req.body;
+            consultationData.consultation_date = new Date(); 
 
             const consultationId = await MedicalRecord.addConsultation(
                 medicalRecordId, 
