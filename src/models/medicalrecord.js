@@ -10,12 +10,13 @@ class MedicalRecord {
         const recordCode = await this.generateRecordCode();
         
         const { blood_type, height, weight, allergies, chronic_diseases, current_medications } = recordData;
+         const consultationDate = consultationData.consultation_date || new Date();
         
         const result = await pool.query(
             `INSERT INTO medical_records 
             (patient_id, doctor_id, record_code, blood_type, height, weight, allergies, chronic_diseases, current_medications) 
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-            [patientId, doctorId, recordCode, blood_type, height, weight, allergies, chronic_diseases, current_medications]
+            [patientId, doctorId, recordCode, blood_type, height, weight, allergies, chronic_diseases, current_medications, consultationDate]
         );
         return { id: result.rows[0].id, recordCode };
     }
