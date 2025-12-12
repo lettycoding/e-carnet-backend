@@ -9,6 +9,7 @@ import authRoutes from './routes/authroutes.js';
 import doctorRoutes from './routes/doctorroutes.js';
 import patientRoutes from './routes/patientroutes.js';
 
+
 import consultationRoutes from './routes/consultationroutes.js';
 
 const app = express();
@@ -29,7 +30,8 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use('/api/auth', authRoutes);
 app.use('/api/doctors', doctorRoutes);
 app.use('/api/patients', patientRoutes);
-app.use('/api/consultations', consultationRoutes); // ← Ajout des routes de consultation
+app.use('/api/consultations', consultationRoutes);
+app.use('/api/medical-records',consultationRoutes); // ← Ajout des routes de consultation
 
 // Route de santé
 app.get('/health', (req, res) => {
